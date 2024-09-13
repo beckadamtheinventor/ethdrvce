@@ -1,2 +1,3 @@
-# ethdrvce
-raw ethernet drivers for TI-84+ CE
+### Hello World Demo
+
+Displays the text `Hello, World!` on the calculator.
