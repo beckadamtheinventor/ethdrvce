@@ -6,11 +6,38 @@
 	objectVersion = 56;
 	objects = {
 
+/* Begin PBXFileReference section */
+		85485D6F2C9A44AD00C61590 /* icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = icon.png; sourceTree = "<group>"; };
+		85485D702C9A44AD00C61590 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		85485D712C9A44AD00C61590 /* makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = makefile; sourceTree = "<group>"; };
+		85485D722C9A44AD00C61590 /* readme.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = readme.md; sourceTree = "<group>"; };
+		85485D732C9A44AD00C61590 /* screenshot.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = screenshot.png; sourceTree = "<group>"; };
+		85485D742C9A44AD00C61590 /* ethdrvce.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ethdrvce.h; sourceTree = "<group>"; };
+		85485D752C9A44AD00C61590 /* ethdrvce.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ethdrvce.c; sourceTree = "<group>"; };
+		85485D762C9A44AD00C61590 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
 /* Begin PBXGroup section */
 		852130D72C92859D004E3CD9 = {
 			isa = PBXGroup;
 			children = (
+				85485D6F2C9A44AD00C61590 /* icon.png */,
+				85485D702C9A44AD00C61590 /* LICENSE */,
+				85485D712C9A44AD00C61590 /* makefile */,
+				85485D722C9A44AD00C61590 /* readme.md */,
+				85485D732C9A44AD00C61590 /* screenshot.png */,
+				85485D772C9A44AD00C61590 /* src */,
 			);
+			sourceTree = "<group>";
+		};
+		85485D772C9A44AD00C61590 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				85485D742C9A44AD00C61590 /* ethdrvce.h */,
+				85485D752C9A44AD00C61590 /* ethdrvce.c */,
+				85485D762C9A44AD00C61590 /* main.c */,
+			);
+			path = src;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -43,7 +70,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 852130DB2C92859D004E3CD9 /* Build configuration list for PBXProject "ETHDRVCE" */;
+			buildConfigurationList = 852130DB2C92859D004E3CD9 /* Build configuration list for PBXProject "ethdrvce" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -200,7 +227,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		852130DB2C92859D004E3CD9 /* Build configuration list for PBXProject "ETHDRVCE" */ = {
+		852130DB2C92859D004E3CD9 /* Build configuration list for PBXProject "ethdrvce" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				852130DD2C92859D004E3CD9 /* Debug */,
