@@ -1,0 +1,171 @@
+Section          Base   Top    High   Length
+---------------- ------ ------ ------ -------
+.icon            D1A882 D1A99D           11Bh
+.init.libs       D1A99D D1A9F5            58h
+.libs            D1A9F5 D1AA56            61h
+.init.clock      D1AA56 D1AA56             0h
+.init.reruncheck D1AA56 D1AA56             0h
+.init            D1AA56 D1AA82            2Ch
+.fini            D1AA82 D1AAB6            34h
+.text            D1AAB6 D1E128          3672h
+.data            D1E128 D1E13B            13h
+.rodata          D1E13B D1E26E           133h
+.init_array      000000 000000             0h
+.ctors           000000 000000             0h
+.dtors           000000 000000             0h
+.fini_array      000000 000000             0h
+.bss             D052C6 D05CD8 D13FD8    A12h
+.header          D1A87F D1A882             3h
+
+Label                                         Value
+-------------------------------------------   ------
+___low_bss                                  = D052C6
+___len_bss                                  = 000A12
+___heaptop                                  = D13FD8
+___heapbot                                  = D05CD8
+___libs                                     = D1A9F5
+___init_array_count                         = 000000
+___ctors_count                              = 000000
+___dtors_count                              = 000000
+___fini_array_count                         = 000000
+__stack                                     = D1A87E
+__bshl                                      = D1AAB6
+__frameset                                  = D1AABF
+__frameset0                                 = D1AACD
+__iand                                      = D1AAD8
+__idvrmu.hijack_a_iters_ude_dividend        = D1AAF5
+__imulu                                     = D1AB09
+__indcallhl                                 = D1AB39
+__ineg                                      = D1AB3A
+__ior                                       = D1AB43
+__ishl                                      = D1AB5C
+__ishrs                                     = D1AB87
+__ishru                                     = D1AB82
+__ixor                                      = D1ABC3
+__ladd                                      = D1ABDC
+__land                                      = D1ABE2
+__lcmpu                                     = D1ABFD
+__lcmpzero                                  = D1AC05
+__lladd                                     = D1AC0D
+__lland                                     = D1AC31
+__llcmpu                                    = D1AC6E
+__llcmpzero                                 = D1AC98
+__llctlz                                    = D1ACAD
+__lldivs                                    = D1ACC5
+__lldivu                                    = D1AD15
+__lldvrmu                                   = D1AD29
+__lldvrmu.hijack                            = D1AD30
+__llmulu                                    = D1AD87
+__llneg                                     = D1ADDC
+__llshl                                     = D1ADF5
+__llshrs.hijack_llshru                      = D1AE23
+__llshrs.finish                             = D1AE42
+__llshru                                    = D1AE46
+__llsub                                     = D1AE60
+__lshrs.hijack_lshru                        = D1AE8E
+__lshru                                     = D1AE9D
+__fcmp                                      = 000274
+__ftol                                      = 00027C
+__ftoul                                     = 00027C
+__indcall                                   = 00015C
+__ltof                                      = 000284
+__setflag                                   = 000218
+__ultof                                     = 000280
+__sdvrmu                                    = D1AEAD
+__sremu                                     = D1AEBD
+_os_DisableHomeTextBuffer                   = D1AEC4
+_os_EnableHomeTextBuffer                    = D1AED6
+_random                                     = D1AEE8
+__state                                     = D1E128
+_os_ClrLCD                                  = 02080C
+_os_HomeUp                                  = 020828
+_os_DrawStatusBar                           = 021A3C
+_os_GetCSC                                  = 021D3C
+_free                                       = D1AF3F
+_malloc                                     = D1AFFC
+__alloc_base                                = D052C6
+_npf_vpprintf                               = D1B09B
+JTI0_0                                      = D1E13B
+JTI0_1                                      = D1E159
+JTI0_2                                      = D1E19E
+JTI0_3                                      = D1E1BF
+JTI0_4                                      = D1E1D7
+JTI0_5                                      = D1E1EF
+_npf_utoa_rev                               = D1C805
+__printf_c                                  = D1C8CD
+__vsnprintf_c                               = D1C8EC
+_npf_bufputc                                = D1C972
+_npf_bufputc_nop                            = D1C997
+__snprintf_c                                = D1C99E
+__vsprintf_c                                = D1C9C6
+__vprintf_c                                 = D1C9E5
+_npf_putc_std                               = D1CA05
+__sprintf_c                                 = D1CA15
+_.str                                       = D1E207
+_.str.1                                     = D1E20B
+_.str.2                                     = D1E20F
+_memset                                     = D1CA3E
+_memcpy                                     = 0000A4
+_strlen                                     = 0000D4
+_outchar                                    = D1CA55
+_printf                                     = D1C8CD
+_vprintf                                    = D1C9E5
+_vsnprintf                                  = D1C8EC
+_sbrk                                       = D1CA6B
+__sbrkbase                                  = D1E138
+.missingappvar                              = D1E213
+.libloadname                                = D1E218
+.libloadnamelen                             = 000007
+.webaddress                                 = D1E220
+__start                                     = D1AA56
+___exithl                                   = D1AA82
+skip._exit                                  = D1AA82
+skip.__Exit                                 = D1AA82
+skip._abort                                 = D1AA82
+_exit.sp                                    = D1AA83
+_exit.flash_wait_states                     = D1AA8D
+_nibble                                     = D1CA89
+_interrupt_receive_callback                 = D1CAF5
+_eth_tx_callback                            = D1CBD5
+_ecm_receive_callback                       = D1CC3D
+_ecm_bulk_transmit                          = D1CD9D
+_ncm_control_setup                          = D1CE56
+_ncm_receive_callback                       = D1CF87
+_ncm_bulk_transmit                          = D1D1C0
+_eth_UsbCheckConfigureHubs                  = D1D322
+_eth_Open                                   = D1D409
+_eth_Write                                  = D1DE59
+_eth_Read                                   = D1DEA9
+_eth_Close                                  = D1DF37
+_eth_event_callback                         = D1DFBF
+JTI14_0                                     = D1E235
+_main                                       = D1E04A
+_eth_int_buf                                = D052CC
+_usr_free                                   = D0530C
+_usr_malloc                                 = D0530F
+_eth_rx_buf                                 = D05312
+_eth_init                                   = D05B12
+_eth                                        = D05B13
+_.str                                       = D1E241
+_.str.1                                     = D1E250
+_.str.2                                     = D1E25F
+lib.LibLoad                                 = D1A9F5
+_#usb_Init                                  = D1AA0A
+_#usb_Cleanup                               = D1AA0E
+_#usb_HandleEvents                          = D1AA12
+_#usb_RefDevice                             = D1AA16
+_#usb_UnrefDevice                           = D1AA1A
+_#usb_SetDeviceData                         = D1AA1E
+_#usb_GetDeviceFlags                        = D1AA22
+_#usb_ResetDevice                           = D1AA26
+_#usb_GetConfigurationDescriptorTotalLength = D1AA2A
+_#usb_GetDescriptor                         = D1AA2E
+_#usb_GetStringDescriptor                   = D1AA32
+_#usb_SetConfiguration                      = D1AA36
+_#usb_SetInterface                          = D1AA3A
+_#usb_GetDeviceEndpoint                     = D1AA3E
+_#usb_SetEndpointData                       = D1AA42
+_#usb_GetEndpointData                       = D1AA46
+_#usb_GetRole                               = D1AA4A
+_#usb_ControlTransfer                       = D1AA4E
+_#usb_ScheduleTransfer                      = D1AA52
