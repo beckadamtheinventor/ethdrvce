@@ -146,19 +146,19 @@ typedef struct _eth_device eth_device_t;
 typedef struct _eth_transfer eth_transfer_t;
 typedef void (*eth_transfer_callback_t)(eth_error_t error, eth_transfer_t *xfer);
 
-/* Defines a structure for holding transfer data. */
+/** @struct Defines a structure for holding transfer data. */
 typedef struct _eth_transfer {
-    void *buffer;
-    size_t len;
-    eth_transfer_callback_t callback;
-    void *callback_data;
-    uint8_t priv[64];
+    void *buffer;           /**< Pointer to data to send for TX or pointer to RX datagram */
+    size_t len;             /**< Length of TX or RX data. */
+    eth_transfer_callback_t callback;   /**< Callback function when TX complete (NULL for RX) */
+    void *callback_data;                /**< Opague pointer accessible in callback. */
+    uint8_t priv[64];       /**< Used for NTB encapsulation for NCM devices. */
 } eth_transfer_t;
 
 struct _eth_device {
     usb_device_t dev;           /**< USB device */
     uint8_t type;               /**< USB device subtype (ECM/NCM) */
-    uint8_t hwaddr[6];
+    uint8_t hwaddr[6];          /**< MAC address of device. */
     struct {
         /** Endpoint refs for device. */
         usb_endpoint_t tx;
@@ -167,10 +167,10 @@ struct _eth_device {
     } endpoint;
     struct {
         /** Defines link-level callbacks (ECM/NCM usb bulk transfer) */
-        usb_transfer_callback_t rx;
-        eth_transfer_callback_t recvd;
-        bool (*tx)(eth_device_t *device, eth_transfer_t *xfer);
-        usb_transfer_callback_t interrupt;
+        usb_transfer_callback_t rx;         // handles RX - internal
+        eth_transfer_callback_t recvd;      // user-callback for handling incoming datagrams
+        bool (*tx)(eth_device_t *device, eth_transfer_t *xfer);     // handles TX - internal
+        usb_transfer_callback_t interrupt;  // handles interrupts - internal
     } link_fn;
     struct eth_ntb_parameters ntb_params;       /**< NCM parameters, unused for ECM. */
     uint16_t sequence;                          /**< per NCM device - transfer sequence counter */
@@ -178,17 +178,21 @@ struct _eth_device {
     bool network_connection:1;                  /**< Connection state of interface. */
 };
 
+/// @brief Include this function in your ethernet usb event callback's @b enabled section to handle hubs.
 bool eth_USBHandleHubs(usb_device_t device);
 
-
+/// @brief Opens a \p eth_device linked to \p usb_device.
 eth_error_t eth_Open(eth_device_t *eth_device,
                      usb_device_t usb_device,
                      eth_transfer_callback_t recvd_fn);
 
+/// @brief Sets a new RX callback function.
 bool eth_SetRecvdCallback(eth_device_t *eth_device, eth_transfer_callback_t recvd_fn);
+
+/// @brief Sends and Ethernet transfer.
 eth_error_t eth_Write(eth_device_t *eth_device, eth_transfer_t *xfer);
 
-
+/// @brief Closes an \p eth_device_t.
 eth_error_t eth_Close(eth_device_t *eth_device);
 
 #endif
