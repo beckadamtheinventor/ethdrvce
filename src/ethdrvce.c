@@ -5,14 +5,7 @@
 #include <usbdrvce.h>
 #include "ethdrvce.h"
 
-void* (*usr_malloc)(size_t);
-void (*usr_free)(void*);
-
-
-
-
 uint8_t eth_rx_buf[ETH_RX_BUFFER_SIZE];
-uint8_t eth_tx_buf[ETHERNET_MTU];
 uint8_t eth_int_buf[ETH_INTERRUPT_BUFFER_SIZE];
 
 /// UTF-16 -> hex conversion
@@ -33,17 +26,13 @@ nibble(uint16_t c)
 
 
 usb_error_t
-interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
+interrupt_receive_callback(usb_endpoint_t endpoint,
                            usb_transfer_status_t status,
                            size_t transferred,
                            __attribute__((unused)) usb_transfer_data_t *data) {
     eth_device_t* eth_device = usb_GetEndpointData(endpoint);
 
-    if (status)     // this indicates a transfer issue
-        if(eth_device->error_fn)    // if error callback set
-            eth_device->error_fn(eth_device, ETH_ERROR_TRANSFER_ERROR);   // report error via callback
-    
-    else if ((status == USB_TRANSFER_COMPLETED) && transferred) {
+    if ((status == USB_TRANSFER_COMPLETED) && transferred) {
         usb_control_setup_t *notify;
         size_t bytes_parsed = 0;
         do {
@@ -66,17 +55,17 @@ interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
     return USB_SUCCESS;
 }
 
-usb_error_t eth_tx_callback(usb_endpoint_t endpoint,
-                                   usb_transfer_status_t status,
-                                   size_t transferred,
-                                   usb_transfer_data_t *data) {
-    eth_device_t* eth_device = usb_GetEndpointData(endpoint);
+usb_error_t eth_tx_callback(__attribute__((unused)) usb_endpoint_t endpoint,
+                            usb_transfer_status_t status,
+                            __attribute__((unused)) size_t transferred,
+                            usb_transfer_data_t *data) {
+    eth_transfer_t* xfer = (eth_transfer_t*)data;
+    eth_error_t err = ETH_OK;
     if (status)     // this indicates a transfer issue
-        if(eth_device->error_fn)    // if error callback set
-            eth_device->error_fn(eth_device, ETH_ERROR_TRANSFER_ERROR);   // report error via callback
+        err = ETH_ERROR_TRANSFER_ERROR;
     
-    if(eth_device->network_fn.sent)     // if link-layer sent callback
-        eth_device->network_fn.sent(eth_device, data, transferred, NULL);   // call it
+    if(xfer->callback)     // if link-layer sent callback
+        xfer->callback(err, xfer);   // call it
     
     return USB_SUCCESS;
 }
@@ -84,18 +73,20 @@ usb_error_t eth_tx_callback(usb_endpoint_t endpoint,
 
 ///------------------------------------------------------------------------
 /// @brief linkinput callback function for @b Ethernet_Control_Model (ECM)
-usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
+usb_error_t ecm_receive_callback(usb_endpoint_t endpoint,
                                  usb_transfer_status_t status,
                                  size_t transferred,
                                  __attribute__((unused)) usb_transfer_data_t *data){
     eth_device_t* eth_device = usb_GetEndpointData(endpoint);
+    eth_transfer_t xfer;
+    eth_error_t err = ETH_OK;
+    memset(&xfer, 0, sizeof xfer);
     
-    if (status)     // this indicates a transfer issue
-        if(eth_device->error_fn)    // if error callback set
-            eth_device->error_fn(eth_device, ETH_ERROR_TRANSFER_ERROR);   // report error via callback
-
-    else if ((status == USB_TRANSFER_COMPLETED) && transferred)     // no error and data xfered
-        eth_device->network_fn.recved(eth_device, eth_rx_buf, transferred, NULL);   // net-layer callback
+    if ((status == USB_TRANSFER_COMPLETED) && transferred) {     // no error and data xfered
+        xfer.buffer = eth_rx_buf;
+        xfer.len = transferred;
+        eth_device->link_fn.recvd(err, &xfer);
+    }
     
     usb_ScheduleBulkTransfer(eth_device->endpoint.rx, eth_rx_buf, ETHERNET_MTU, eth_device->link_fn.rx, NULL);
     return USB_SUCCESS;
@@ -104,20 +95,13 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
 
 ///----------------------------------------------------------------
 /// @brief linkoutput function for @b Ethernet_Control_Model (ECM)
-bool ecm_bulk_transmit(eth_device_t* device, void* buf, size_t len)
+bool ecm_bulk_transmit(eth_device_t* device, eth_transfer_t *xfer)
 {
-    struct eth_packet *output = usr_malloc(len + sizeof(struct eth_packet));
-    if(len <= ETHERNET_MTU) {
-        if(output){
-            output->length = len;
-            memcpy(output->data, buf, len);
-            usb_ScheduleBulkTransfer(device->endpoint.tx, output->data, output->length, eth_tx_callback, output);
-        } else device->err = ETH_ERROR_NO_MEMORY;
+    if(xfer->len <= ETHERNET_MTU) {
+        usb_ScheduleBulkTransfer(device->endpoint.tx, xfer->buffer, xfer->len, eth_tx_callback, xfer);
+        return true;
     }
-    else device->err = ETH_ERROR_MTU_OVERFLOW;
-    if(device->err && device->dispatch.error)
-        device->dispatch.error(device->err);
-    return USB_SUCCESS;
+    return false;
 }
 
 
@@ -212,11 +196,10 @@ usb_error_t ncm_receive_callback(usb_endpoint_t endpoint,
                                  __attribute__((unused)) usb_transfer_data_t *data)
 {
     eth_device_t* eth_device = usb_GetEndpointData(endpoint);
-    if (status)     // this indicates a transfer issue
-        if(eth_device->error_fn)    // if error callback set
-            eth_device->error_fn(eth_device, ETH_ERROR_TRANSFER_ERROR);   // report error via callback
+    eth_transfer_t xfer;
+    memset(&xfer, 0, sizeof xfer);
 
-    else if((status == USB_TRANSFER_COMPLETED) && transferred) {
+    if((status == USB_TRANSFER_COMPLETED) && transferred) {
         bool parse_ntb = true;
         
         // get header and first NDP pointers
@@ -242,7 +225,10 @@ usb_error_t ncm_receive_callback(usb_endpoint_t endpoint,
             do
             {
         
-                eth_device->network_fn.recved(eth_device, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen, NULL);   // net-layer callback
+                xfer.buffer = &ntb[idx[dg_num].wDatagramIndex];
+                xfer.len = idx[dg_num].wDatagramLen;
+                                   
+                eth_device->link_fn.recvd(ETH_OK, &xfer);   // net-layer callback
                 
                 dg_num++;
             } while ((idx[dg_num].wDatagramIndex) && (idx[dg_num].wDatagramLen));
@@ -267,40 +253,40 @@ usb_error_t ncm_receive_callback(usb_endpoint_t endpoint,
                                          
 ///---------------------------------------------------------------
 /// @brief linkoutput function for @b Network_Control_Model (NCM)
-bool ncm_bulk_transmit(eth_device_t* device, void* buf, size_t len)
+bool ncm_bulk_transmit(eth_device_t* device, eth_transfer_t *xfer)
 {
-    size_t outlen = len + NCM_HBUF_SIZE;
-    uint8_t *output = usr_malloc(outlen);
-    if(output){
-        memset(output, 0, outlen);
-
-        // set up NTH
-        uint16_t offset_ndp = get_next_offset(NCM_NTH_LEN, device->ntb_params.wNdpInAlignment, 0);
-        struct ncm_nth *nth = (struct ncm_nth *)output;
-        nth->dwSignature = NCM_NTH_SIG;
-        nth->wHeaderLength = NCM_NTH_LEN;
-        nth->wSequence = device->sequence++;
-        nth->wBlockLength = NCM_HBUF_SIZE + len;
-        nth->wNdpIndex = offset_ndp;
-        
-        // set up NDP
-        struct ncm_ndp *ndp = (struct ncm_ndp *)&output[offset_ndp];
-        ndp->dwSignature = NCM_NDP_SIG0;
-        ndp->wLength = NCM_NDP_LEN + 4;
-        ndp->wNextNdpIndex = 0;
-        ndp->wDatagramIdx[0].wDatagramIndex = NCM_HBUF_SIZE;
-        ndp->wDatagramIdx[0].wDatagramLen = len;
-        ndp->wDatagramIdx[1].wDatagramIndex = 0;
-        ndp->wDatagramIdx[1].wDatagramLen = 0;
-        
-        // copy data to buffer
-        memcpy(&output[NCM_HBUF_SIZE], buf, len);
-        
-        usb_ScheduleBulkTransfer(device->endpoint.tx, output, outlen, eth_tx_callback, output);
-    } else device->err = ETH_ERROR_NO_MEMORY;
+    if( device==NULL || xfer==NULL )
+        return false;
     
-    if(device->err && device->dispatch.error)
-        device->dispatch.error(device->err);
+    memset(xfer->priv, 0, 64);
+    uint16_t offset_ndp = get_next_offset(NCM_NTH_LEN, device->ntb_params.wNdpInAlignment, 0);
+    
+    // set up NTH
+    struct ncm_nth *nth = (struct ncm_nth *)xfer->priv;
+    nth->dwSignature = NCM_NTH_SIG;
+    nth->wHeaderLength = NCM_NTH_LEN;
+    nth->wSequence = device->sequence++;
+    nth->wBlockLength = NCM_HBUF_SIZE + xfer->len;
+    nth->wNdpIndex = offset_ndp;
+        
+    // set up NDP
+    struct ncm_ndp *ndp = (struct ncm_ndp *)&xfer->priv[offset_ndp];
+    ndp->dwSignature = NCM_NDP_SIG0;
+    ndp->wLength = NCM_NDP_LEN + 4;
+    ndp->wNextNdpIndex = 0;
+    ndp->wDatagramIdx[0].wDatagramIndex = NCM_HBUF_SIZE;
+    ndp->wDatagramIdx[0].wDatagramLen = xfer->len;
+    ndp->wDatagramIdx[1].wDatagramIndex = 0;
+    ndp->wDatagramIdx[1].wDatagramLen = 0;
+        
+    // send headers
+    usb_ScheduleBulkTransfer(device->endpoint.tx, xfer->priv, 64, NULL, NULL);
+    // send datagram
+    usb_ScheduleBulkTransfer(device->endpoint.tx, xfer->buffer, xfer->len, eth_tx_callback, xfer);
+    // if multiple of packet size, send 0-len transfer
+    if(xfer->len % 64 == 0)
+        usb_ScheduleBulkTransfer(device->endpoint.tx, xfer->buffer, 0, NULL, NULL);
+    
     return USB_SUCCESS;
 }
 
@@ -344,21 +330,17 @@ bool eth_USBHandleHubs(usb_device_t device){
 
 eth_error_t eth_Open(eth_device_t *eth_device,
                      usb_device_t usb_device,
-                     eth_network_handle_fn recved_fn,
-                     eth_network_handle_fn sent_fn,
-                     eth_error_handle_fn error_fn){
+                     eth_transfer_callback_t recvd_fn){
     memset(eth_device, 0, sizeof (eth_device_t));
     if((eth_device == NULL) ||
        (usb_device == NULL) ||
-       (recved_fn == NULL)){
-        eth_err = ETH_ERROR_DEVICE_CONFIG_ERROR;
-        goto exit_error;
-    }
+       (recvd_fn == NULL))
+        return ETH_ERROR_INVALID_PARAM;
+       
     
     usb_RefDevice(usb_device);
     size_t xferd, parsed_len, desc_len;
     usb_error_t err;
-    eth_error_t eth_err = ETH_OK;
     
     struct
     {
@@ -383,16 +365,13 @@ eth_error_t eth_Open(eth_device_t *eth_device,
     } descriptor;
     
     err = usb_GetDeviceDescriptor(usb_device, &descriptor.dev, sizeof(usb_device_descriptor_t), &xferd);
-    if (err || (xferd != sizeof(usb_device_descriptor_t))){
-        eth_err = ETH_ERROR_DEVICE_CONFIG_ERROR;
-        goto exit_error;
-    }
+    if (err || (xferd != sizeof(usb_device_descriptor_t)))
+        return ETH_ERROR_DEVICE_CONFIG_ERROR;
+     
     // check for main DeviceClass being type 0x00 - composite/if-specific
-    if (descriptor.dev.bDeviceClass != USB_INTERFACE_SPECIFIC_CLASS){
-        eth_err = ETH_ERROR_DEVICE_INCOMPATIBLE;
-        goto exit_error;
-    }
-    
+    if (descriptor.dev.bDeviceClass != USB_INTERFACE_SPECIFIC_CLASS)
+        return ETH_ERROR_DEVICE_INCOMPATIBLE;
+   
     // parse both configs for the correct one
     uint8_t num_configs = descriptor.dev.bNumConfigurations;
     for (uint8_t config = 0; config < num_configs; config++)
@@ -483,10 +462,9 @@ eth_error_t eth_Open(eth_device_t *eth_device,
                             configdata.addr = &descriptor.conf;
                             configdata.len = desc_len;
                             eth_device->type = iface->bInterfaceSubClass;
-                            if (usb_SetConfiguration(usb_device, configdata.addr, configdata.len)){
-                                eth_err = ETH_ERROR_DEVICE_CONFIG_ERROR;
-                                goto exit_error;
-                            }
+                            if (usb_SetConfiguration(usb_device, configdata.addr, configdata.len))
+                                return ETH_ERROR_DEVICE_CONFIG_ERROR;
+                           
                             parse_state |= PARSE_HAS_CONTROL_IF;
                         }
                     }
@@ -559,14 +537,12 @@ eth_error_t eth_Open(eth_device_t *eth_device,
             desc = (usb_descriptor_t *)(((uint8_t *)desc) + desc->bLength);
         }
     }
-    return false;
+    return ETH_ERROR_DEVICE_CONFIG_ERROR;
 init_success:
     eth_device->dev = usb_device;
     if(eth_device->type == ETH_TYPE_NCM)
-        if (ncm_control_setup(eth_device)){
-            eth_err = ETH_ERROR_DEVICE_CONFIG_ERROR;
-            goto exit_error;
-        }
+        if (ncm_control_setup(eth_device))
+            return ETH_ERROR_DEVICE_CONFIG_ERROR;
     
     /// Set link-layer functions
     eth_device->link_fn.rx = (eth_device->type == ETH_TYPE_NCM)   ? ncm_receive_callback
@@ -578,28 +554,26 @@ init_success:
     : NULL;
     
     eth_device->link_fn.interrupt = interrupt_receive_callback;
-    
-    eth_device->network_fn.recved = recved_fn;
-    eth_device->network_fn.sent = sent_fn;
-    eth_device->error_fn = error_fn;
+    eth_device->link_fn.recvd = recvd_fn;
     
     if ((eth_device->link_fn.tx == NULL) ||
         (eth_device->link_fn.rx == NULL) ||
-        (eth_device->network_fn.recved == NULL)){
-        eth_err = ETH_ERROR_DEVICE_CONFIG_ERROR;
-        goto exit_error;
-    }
+        (eth_device->link_fn.recvd == NULL))
+        return ETH_ERROR_DEVICE_CONFIG_ERROR;
     
     // switch to alternate interface
-    if (usb_SetInterface(usb_device, if_bulk.addr, if_bulk.len)){
-        eth_err = ETH_ERROR_DEVICE_CONFIG_ERROR;
-        goto exit_error;
-    }
-    
+    if (usb_SetInterface(usb_device, if_bulk.addr, if_bulk.len))
+        return ETH_ERROR_DEVICE_CONFIG_ERROR;
+        
     // set endpoints
     eth_device->endpoint.rx = usb_GetDeviceEndpoint(usb_device, endpoint_addr.in);
     eth_device->endpoint.tx = usb_GetDeviceEndpoint(usb_device, endpoint_addr.out);
     eth_device->endpoint.interrupt = usb_GetDeviceEndpoint(usb_device, endpoint_addr.interrupt);
+    
+    if(eth_device->type == ETH_TYPE_NCM)
+        // NCM we need to do manual terminate mode
+        usb_SetEndpointFlags(eth_device->endpoint.tx, USB_MANUAL_TERMINATE);
+    
     // set eth_device_t as data to endpoint and device
     usb_SetEndpointData(eth_device->endpoint.rx, eth_device);
     usb_SetEndpointData(eth_device->endpoint.tx, eth_device);
@@ -610,32 +584,28 @@ init_success:
     usb_ScheduleInterruptTransfer(eth_device->endpoint.interrupt,
                                   eth_int_buf, ETH_INTERRUPT_BUFFER_SIZE,
                                   eth_device->link_fn.interrupt, NULL);
-    usb_ScheduleBulkTransfer(eth_device->endpoint.rx,
-                             eth_rx_buf, (eth_device->type == ETH_TYPE_NCM) ? ETH_RX_BUFFER_SIZE : ETHERNET_MTU,
-                             eth_device->link_fn.rx, NULL);
+    usb_ScheduleBulkTransfer(eth_device->endpoint.rx, eth_rx_buf,
+                             (eth_device->type == ETH_TYPE_NCM) ? ETH_RX_BUFFER_SIZE : ETHERNET_MTU, eth_device->link_fn.rx, NULL);
     return ETH_OK;
-exit_error:
-    if(eth_device->error_fn)    // if error callback set
-        eth_device->error_fn(eth_device, eth_err);   // report error via callback
-    return eth_err;
+}
+
+bool eth_SetRecvdCallback(eth_device_t *eth_device, eth_transfer_callback_t recvd_fn){
+    if(recvd_fn==NULL) return false;
+    eth_device->link_fn.recvd = recvd_fn;
+    return true;
 }
 
 
-eth_error_t eth_Write(eth_device_t *eth_device, uint8_t *buf, size_t len){
+eth_error_t eth_Write(eth_device_t *eth_device, eth_transfer_t *xfer){
     eth_error_t err;
-    if(eth_device == NULL || buf == NULL || len == 0){
-        err = ETH_ERROR_INVALID_PARAM;
-        goto exit_error;
-    }
+    if(eth_device == NULL || xfer == NULL)
+        return ETH_ERROR_INVALID_PARAM;
+    
     if(eth_device->link_fn.tx){
-        if(eth_device->link_fn.tx(eth_device, buf, len)==ETH_OK)
+        if(eth_device->link_fn.tx(eth_device, xfer))
             return ETH_OK;
         else err = ETH_ERROR_TRANSFER_ERROR;
     } else err = ETH_ERROR_DEVICE_CONFIG_ERROR;
-        
-exit_error:
-    if(eth_device->error_fn)    // if error callback set
-        eth_device->error_fn(eth_device, err);   // report error via callback
     return err;
 }
 
@@ -646,3 +616,4 @@ eth_error_t eth_Close(eth_device_t *eth_device){
     memset(eth_device, 0, sizeof (eth_device_t));
     return ETH_OK;
 }
+

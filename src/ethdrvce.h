@@ -18,8 +18,9 @@
 /* Interrupt buffer size */
 #define ETH_INTERRUPT_BUFFER_SIZE 64
 
-/* NCM rx ntb size */
-#define ETH_RX_BUFFER_SIZE 2048
+/* Reserved buffer sizes */
+#define ETH_RX_BUFFER_SIZE  2048
+#define ETH_TX_BUFFER_SIZE  2048
 
 /* USB CDC Ethernet Device Classes */
 enum eth_cdc_ethernet_device_types {
@@ -138,15 +139,22 @@ struct eth_ntb_parameters {
     uint16_t wNtbOutMaxDatagrams;
 };
 
-/* Defines a structure for holding chains of packets. */
-struct eth_packet {
-    size_t length;
-    uint8_t data[];
-};
 
 struct _eth_device;
+struct _eth_transfer;
 typedef struct _eth_device eth_device_t;
-#define ETH_RX_QUEUE_MAX 64
+typedef struct _eth_transfer eth_transfer_t;
+typedef void (*eth_transfer_callback_t)(eth_error_t error, eth_transfer_t *xfer);
+
+/* Defines a structure for holding transfer data. */
+typedef struct _eth_transfer {
+    void *buffer;
+    size_t len;
+    eth_transfer_callback_t callback;
+    void *callback_data;
+    uint8_t priv[64];
+} eth_transfer_t;
+
 struct _eth_device {
     usb_device_t dev;           /**< USB device */
     uint8_t type;               /**< USB device subtype (ECM/NCM) */
@@ -160,46 +168,25 @@ struct _eth_device {
     struct {
         /** Defines link-level callbacks (ECM/NCM usb bulk transfer) */
         usb_transfer_callback_t rx;
-        usb_transfer_callback_t tx;
+        eth_transfer_callback_t recvd;
+        bool (*tx)(eth_device_t *device, eth_transfer_t *xfer);
         usb_transfer_callback_t interrupt;
     } link_fn;
-    struct {
-        /** Defines network-level callbacks (lwIP or other network funcs). */
-        eth_network_handle_fn recved;
-        eth_network_handle_fn sent;
-    } network_fn;
-    eth_error_handle_fn error_fn;
     struct eth_ntb_parameters ntb_params;       /**< NCM parameters, unused for ECM. */
     uint16_t sequence;                          /**< per NCM device - transfer sequence counter */
     uint8_t bm_capabilities;                    /**< device capabilities */
     bool network_connection:1;                  /**< Connection state of interface. */
 };
 
-typedef eth_error_t (*eth_network_handle_fn)(eth_device_t *device,
-                                             void *transfer_data,
-                                             size_t transter_len,
-                                             void *callback_data);
-
-
-typedef void (*eth_error_handle_fn)(eth_device_t *device,
-                                    eth_error_t errno);
-
-
 bool eth_USBHandleHubs(usb_device_t device);
 
 
 eth_error_t eth_Open(eth_device_t *eth_device,
                      usb_device_t usb_device,
-                     eth_network_handle_fn recved_fn,
-                     eth_network_handle_fn sent_fn,
-                     eth_error_handle_fn error_fn);
+                     eth_transfer_callback_t recvd_fn);
 
-void eth_SetRecvedHandler(eth_device_t *eth_device, eth_network_handle_fn recved);
-void eth_SetSentHandler(eth_device_t *eth_device, eth_network_handle_fn sent);
-void eth_SetErrorHandler(eth_device_t *eth_device, eth_error_handle_fn error_fn);
-
-
-eth_error_t eth_Write(eth_device_t *eth_device, uint8_t *buf, size_t len);
+bool eth_SetRecvdCallback(eth_device_t *eth_device, eth_transfer_callback_t recvd_fn);
+eth_error_t eth_Write(eth_device_t *eth_device, eth_transfer_t *xfer);
 
 
 eth_error_t eth_Close(eth_device_t *eth_device);

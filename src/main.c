@@ -8,6 +8,16 @@
     
 eth_device_t eth;
 bool eth_init = false;
+
+void tx_callback(eth_error_t error, eth_transfer_t *xfer) {
+    if(error) printf("tx error: %u\n", error);
+    else printf("tx len: %u\n", xfer->len);
+}
+
+void rx_callback(eth_error_t error, eth_transfer_t *xfer) {
+    if(error) printf("rx error: %u\n", error);
+    else printf("rx len: %u\n", xfer->len);
+}
     
 usb_error_t eth_event_callback(usb_event_t event, void *event_data, void *callback_data){
     usb_device_t usb_device = event_data;
@@ -19,10 +29,10 @@ usb_error_t eth_event_callback(usb_event_t event, void *event_data, void *callba
                 usb_ResetDevice(usb_device);
             break;
         case USB_DEVICE_ENABLED_EVENT:
-            if(eth_UsbCheckConfigureHubs(usb_device))
+            if(eth_USBHandleHubs(usb_device))
                 break;
             if(!eth_init)
-                eth_init = (bool)(eth_Open(&eth, usb_device)==ETH_OK);
+                eth_init = (bool)(eth_Open(&eth, usb_device, rx_callback)==ETH_OK);
             break;
         case USB_DEVICE_DISCONNECTED_EVENT:
         case USB_DEVICE_DISABLED_EVENT:
@@ -43,9 +53,8 @@ usb_error_t eth_event_callback(usb_event_t event, void *event_data, void *callba
 int main(void)
 {
     /* Clear the homescreen */
-    eth_SetAllocator(malloc, free);
-    struct eth_packet *packet;
-    char sendeth = "This is a test";
+    os_ClrHome();
+    char *sendeth = "This is a test";
     if(usb_Init(eth_event_callback, NULL, NULL, USB_DEFAULT_INIT_FLAGS))
         printf("usb init error");
     
@@ -53,12 +62,12 @@ int main(void)
     
     do {
         key = os_GetCSC();
-        if(key == sk_2nd) eth_Write(&eth, sendeth, strlen(sendeth));
-        eth_Read(&eth, &packet);
-        if(packet) {
-            os_ClrHome();
-            printf("packet len %u\n", packet->length);
-            free(packet);
+        if(key == sk_2nd) {
+            eth_transfer_t xfer;
+            xfer.buffer = sendeth;
+            xfer.len = strlen(sendeth);
+            xfer.callback = tx_callback;
+            eth_Write(&eth, &xfer);
         }
         usb_HandleEvents();
     } while(key != sk_Clear);
