@@ -1,3 +1,3 @@
-### Hello World Demo
+### TI-84+ CE Ethernet Driver
 
-Displays the text `Hello, World!` on the calculator.
+Provides a static library for interfacing with a USB-Ethernet device.
